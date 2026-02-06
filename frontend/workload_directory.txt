@@ -61,3 +61,7 @@ jd@@@com.jingdong.app.mall@@@ANDROID@@@monkey -p com.jingdong.app.mall -c androi
 
 # System Apps (Lightweight, good for baseline testing)
 settings@@@com.android.settings@@@ANDROID@@@am start -n com.android.settings/.Settings
+yuanshen@@@com.miHoYo.Yuanshen@@@ANDROID@@@monkey -p com.miHoYo.Yuanshen -c android.intent.category.LAUNCHER 1
+
+# Games (GPU-intensive, high memory usage)
+yuanshen@@@com.miHoYo.Yuanshen@@@ANDROID@@@monkey -p com.miHoYo.Yuanshen -c android.intent.category.LAUNCHER 1

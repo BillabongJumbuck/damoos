@@ -23,6 +23,7 @@ declare -A COLLECTOR_SCRIPTS=(
     ["swapin"]="swapin_collector_android.sh"
     ["swapout"]="swapout_collector_android.sh"
     ["psi"]="psi_collector_android.sh"
+    ["refault"]="refault_collector_android.sh"
 )
 
 # Start remote metric collector on Android device
