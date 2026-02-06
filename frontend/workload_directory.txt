@@ -33,3 +33,31 @@ silo_ycsb-1@@@dbtest@@@/home/dev4/silo/out-perf.masstree/benchmarks/dbtest --ben
 silo_ycsb0.1@@@dbtest@@@/home/dev4/silo/out-perf.masstree/benchmarks/dbtest --bench ycsb --verbose --scale-factor 100 --runtime 60 -o "--zipfian-alpha 0.1" > /home/dev4/Damoos-v3/scheme_adapters/deep_rl_adapter/silo_ycsb0.1.txt 2>&1 &
 silo_ycsb0.9@@@dbtest@@@/home/dev4/silo/out-perf.masstree/benchmarks/dbtest --bench ycsb --verbose --scale-factor 100 --runtime 60 -o "--zipfian-alpha 0.9" > /home/dev4/Damoos-v3/scheme_adapters/deep_rl_adapter/silo_ycsb0.9.txt 2>&1 &
 silo_ycsb1.5@@@dbtest@@@/home/dev4/silo/out-perf.masstree/benchmarks/dbtest --bench ycsb --verbose --scale-factor 100 --runtime 60 -o "--zipfian-alpha 1.5" > /home/dev4/Damoos-v3/scheme_adapters/deep_rl_adapter/silo_ycsb1.5.txt 2>&1 &
+
+# Android Workloads (via ADB)
+# Format: ShortName@@@PackageName@@@ANDROID@@@ADB_Command
+# Note: Commands use 'adb shell' and will be executed remotely
+
+# Browsers (Multi-process, memory fragmentation)
+quark@@@com.quark.browser@@@ANDROID@@@monkey -p com.quark.browser -c android.intent.category.LAUNCHER 1
+
+# Video & Entertainment (Bursty memory access patterns)
+douyin@@@com.ss.android.ugc.aweme@@@ANDROID@@@monkey -p com.ss.android.ugc.aweme -c android.intent.category.LAUNCHER 1
+bilibili@@@tv.danmaku.bili@@@ANDROID@@@monkey -p tv.danmaku.bili -c android.intent.category.LAUNCHER 1
+
+# Social & Communication (Background resident, stable memory)
+wechat@@@com.tencent.mm@@@ANDROID@@@monkey -p com.tencent.mm -c android.intent.category.LAUNCHER 1
+
+# Navigation (Location-based services)
+amap@@@com.autonavi.minimap@@@ANDROID@@@monkey -p com.autonavi.minimap -c android.intent.category.LAUNCHER 1
+
+# News & Information
+toutiao@@@com.ss.android.article.news@@@ANDROID@@@monkey -p com.ss.android.article.news -c android.intent.category.LAUNCHER 1
+
+# E-commerce & Shopping (Memory-intensive with image loading)
+alipay@@@com.eg.android.AlipayGphone@@@ANDROID@@@monkey -p com.eg.android.AlipayGphone -c android.intent.category.LAUNCHER 1
+taobao@@@com.taobao.taobao@@@ANDROID@@@monkey -p com.taobao.taobao -c android.intent.category.LAUNCHER 1
+jd@@@com.jingdong.app.mall@@@ANDROID@@@monkey -p com.jingdong.app.mall -c android.intent.category.LAUNCHER 1
+
+# System Apps (Lightweight, good for baseline testing)
+settings@@@com.android.settings@@@ANDROID@@@am start -n com.android.settings/.Settings
