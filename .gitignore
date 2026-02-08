@@ -1,0 +1,29 @@
+# Python virtual environments
+venv/
+env/
+*.pyc
+__pycache__/
+
+# Metric collection results
+*.stat
+results/rss/*.stat
+results/runtime/*.stat
+results/refault/*.stat
+results/swapin/*.stat
+results/swapout/*.stat
+results/psi/*.stat
+
+# Test output logs
+*_output.log
+*.log
+
+# Temporary files
+*.tmp
+*.swp
+*~
+.DS_Store
+
+# IDE files
+.vscode/
+.idea/
+*.code-workspace
