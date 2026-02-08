@@ -26,11 +26,12 @@ class AndroidSystem:
         # Bash command prefix to source all necessary ADB scripts
         self.bash_prefix = f"source {self.adb_interface}/adb_utils.sh && source {self.adb_interface}/adb_workload.sh && source {self.adb_interface}/adb_metric_collector.sh && source {self.adb_interface}/adb_damon_control.sh && "
         
-        print(f"Finding original RSS and refault rate of {self.workload}")
+        print(f"Finding original RSS, refault rate, and PSI pressure of {self.workload}")
         
         # Run workload 3 times to get baseline metrics
         rss_samples = []
         refault_samples = []
+        psi_samples = []
         
         for i in range(3):
             print(f"  Baseline run {i+1}/3...")
@@ -61,7 +62,7 @@ class AndroidSystem:
             # Collect metrics for 30 seconds
             print("    Collecting metrics...")
             
-            # Collect RSS and refault rate
+            # Collect RSS, refault rate, and PSI
             subprocess.Popen([
                 "bash", "-c",
                 f"{self.bash_prefix}start_remote_collector rss {pid}"
@@ -70,6 +71,11 @@ class AndroidSystem:
             subprocess.Popen([
                 "bash", "-c",
                 f"{self.bash_prefix}start_remote_collector refault {pid}"
+            ])
+            
+            subprocess.Popen([
+                "bash", "-c",
+                f"{self.bash_prefix}start_remote_collector psi {pid}"
             ])
             
             # Wait 30 seconds
@@ -86,6 +92,11 @@ class AndroidSystem:
                 f"{self.bash_prefix}stop_remote_collector refault {pid}"
             ])
             
+            subprocess.call([
+                "bash", "-c",
+                f"{self.bash_prefix}stop_remote_collector psi {pid}"
+            ])
+            
             # Pull data
             subprocess.call([
                 "bash", "-c",
@@ -95,6 +106,11 @@ class AndroidSystem:
             subprocess.call([
                 "bash", "-c",
                 f"{self.bash_prefix}pull_metric_data refault {pid} {self.path}/results"
+            ])
+            
+            subprocess.call([
+                "bash", "-c",
+                f"{self.bash_prefix}pull_metric_data psi {pid} {self.path}/results"
             ])
             
             # Calculate RSS average
@@ -117,6 +133,33 @@ class AndroidSystem:
                         refault_samples.append(refault_avg)
                         print(f"    Refault rate: {refault_avg:.0f} pages/s")
             
+            # Calculate PSI pressure average
+            psi_file = f"{self.path}/results/psi/{pid}.stat"
+            if os.path.exists(psi_file):
+                with open(psi_file, 'r') as f:
+                    lines = [line.strip() for line in f if line.strip()]
+                    # Skip header line
+                    if lines and lines[0].startswith('timestamp'):
+                        lines = lines[1:]
+                    
+                    if len(lines) >= 2:
+                        # Parse first and last line to get total delta
+                        # Format: timestamp some_avg10 some_avg60 some_avg300 some_total ...
+                        first_parts = lines[0].split()
+                        last_parts = lines[-1].split()
+                        
+                        if len(first_parts) >= 5 and len(last_parts) >= 5:
+                            first_total = float(first_parts[4])  # some_total
+                            last_total = float(last_parts[4])
+                            first_time = float(first_parts[0])
+                            last_time = float(last_parts[0])
+                            
+                            # Calculate pressure per second (microseconds -> seconds)
+                            time_diff = max(last_time - first_time, 1)
+                            psi_avg = (last_total - first_total) / time_diff  # μs/s
+                            psi_samples.append(psi_avg)
+                            print(f"    PSI pressure: {psi_avg:.0f} μs/s")
+            
             # Stop app
             subprocess.call([
                 "bash", "-c",
@@ -135,12 +178,19 @@ class AndroidSystem:
         
         if refault_samples:
             self.orig_refault = sum(refault_samples) / len(refault_samples)
-            print(f"Original Refault Rate: {self.orig_refault:.0f} pages/s\n")
+            print(f"Original Refault Rate: {self.orig_refault:.0f} pages/s")
         else:
             print("Error: No refault samples collected")
             sys.exit(1)
         
-        # For Android apps, we optimize RSS and refault rate
+        if psi_samples:
+            self.orig_psi = sum(psi_samples) / len(psi_samples)
+            print(f"Original PSI Pressure: {self.orig_psi:.0f}\n")
+        else:
+            print("Warning: No PSI samples collected, using default")
+            self.orig_psi = 0  # Default if PSI not available
+        
+        # For Android apps, we optimize RSS, refault rate, and PSI pressure
         self.orig_runtime = 30.0  # Fixed collection period
     
     def reset(self):
@@ -210,7 +260,7 @@ class AndroidSystem:
             f"{self.bash_prefix}damon_start"
         ])
         
-        # Start metric collectors (RSS and refault)
+        # Start metric collectors (RSS, refault, and PSI)
         subprocess.Popen([
             "bash", "-c",
             f"{self.bash_prefix}start_remote_collector rss {self.pid}"
@@ -219,6 +269,11 @@ class AndroidSystem:
         subprocess.Popen([
             "bash", "-c",
             f"{self.bash_prefix}start_remote_collector refault {self.pid}"
+        ])
+        
+        subprocess.Popen([
+            "bash", "-c",
+            f"{self.bash_prefix}start_remote_collector psi {self.pid}"
         ])
         
         # Wait for 30 seconds
@@ -241,6 +296,11 @@ class AndroidSystem:
             f"{self.bash_prefix}stop_remote_collector refault {self.pid}"
         ])
         
+        subprocess.call([
+            "bash", "-c",
+            f"{self.bash_prefix}stop_remote_collector psi {self.pid}"
+        ])
+        
         # Pull data
         subprocess.call([
             "bash", "-c",
@@ -252,12 +312,19 @@ class AndroidSystem:
             f"{self.bash_prefix}pull_metric_data refault {self.pid} {self.path}/results"
         ])
         
-        # Calculate metrics (RSS and refault rate)
+        subprocess.call([
+            "bash", "-c",
+            f"{self.bash_prefix}pull_metric_data psi {self.pid} {self.path}/results"
+        ])
+        
+        # Calculate metrics (RSS, refault rate, and PSI)
         rss_file = f"{self.path}/results/rss/{self.pid}.stat"
         refault_file = f"{self.path}/results/refault/{self.pid}.stat"
+        psi_file = f"{self.path}/results/psi/{self.pid}.stat"
         
         rss = self.orig_rss
         refault = self.orig_refault
+        psi = self.orig_psi
         
         if os.path.exists(rss_file):
             with open(rss_file, 'r') as f:
@@ -271,17 +338,41 @@ class AndroidSystem:
                 if refault_values:
                     refault = sum(refault_values) / len(refault_values)
         
+        if os.path.exists(psi_file):
+            with open(psi_file, 'r') as f:
+                lines = [line.strip() for line in f if line.strip()]
+                # Skip header line
+                if lines and lines[0].startswith('timestamp'):
+                    lines = lines[1:]
+                
+                if len(lines) >= 2:
+                    # Parse first and last line to get total delta
+                    first_parts = lines[0].split()
+                    last_parts = lines[-1].split()
+                    
+                    if len(first_parts) >= 5 and len(last_parts) >= 5:
+                        first_total = float(first_parts[4])  # some_total
+                        last_total = float(last_parts[4])
+                        first_time = float(first_parts[0])
+                        last_time = float(last_parts[0])
+                        
+                        # Calculate pressure per second (microseconds -> seconds)
+                        time_diff = max(last_time - first_time, 1)
+                        psi = (last_total - first_total) / time_diff  # μs/s
+        
         # Calculate overhead
         rss_overhead = ((rss - self.orig_rss) / self.orig_rss) * 100
         refault_overhead = ((refault - self.orig_refault) / max(self.orig_refault, 1)) * 100
+        psi_overhead = ((psi - self.orig_psi) / max(self.orig_psi, 1)) * 100 if self.orig_psi > 0 else 0
         
         print(f"    RSS: {rss:.0f}KB (overhead: {rss_overhead:+.2f}%)")
         print(f"    Refault: {refault:.0f} pages/s (overhead: {refault_overhead:+.2f}%)")
+        print(f"    PSI pressure: {psi:.0f} (overhead: {psi_overhead:+.2f}%)")
         
-        # Reward function: prioritize refault rate (70%), then RSS (30%)
-        # Lower overhead is better for both metrics
-        # Heavily penalize refault increases
-        score = -(refault_overhead * 0.7 + rss_overhead * 0.3)
+        # Reward function: PSI pressure (50%), refault rate (30%), RSS (20%)
+        # Lower overhead is better for all metrics
+        # Heavily penalize PSI pressure and refault increases
+        score = -(psi_overhead * 0.5 + refault_overhead * 0.3 + rss_overhead * 0.2)
         print(f"    Score: {score:.2f}")
         
         # Stop app
